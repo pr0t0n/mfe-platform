@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Portal from './pages/Portal'
+import AppViewer from './pages/AppViewer'
 import Profile from './pages/Profile'
 import AdminApps from './pages/admin/Apps'
 import AdminUsers from './pages/admin/Users'
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route element={<DashboardLayout />}>
           <Route path="/portal" element={<Portal />} />
+          <Route path="/app/:appId" element={<AppViewer />} />
           <Route path="/profile" element={<Profile />} />
           <Route element={<AdminLayout />}>
             <Route path="/admin/apps" element={<AdminApps />} />
