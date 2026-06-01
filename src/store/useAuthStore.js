@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { useUserStore } from './useUserStore'
+import { api } from '../lib/api'
 
 export const useAuthStore = create(
   persist(
@@ -8,23 +8,25 @@ export const useAuthStore = create(
       currentUser: null,
       isAuthenticated: false,
 
-      login: (email, password) => {
-        const user = useUserStore.getState().findByCredentials(email, password)
-        if (user) {
-          const { password: _, ...safeUser } = user
-          set({ currentUser: safeUser, isAuthenticated: true })
+      login: async (email, password) => {
+        try {
+          const { token, user } = await api.login(email, password)
+          localStorage.setItem('cyberops-token', token)
+          set({ currentUser: user, isAuthenticated: true })
           return { success: true }
+        } catch (e) {
+          return { success: false, error: e.message }
         }
-        return { success: false, error: 'E-mail ou senha inválidos, ou usuário inativo.' }
       },
 
-      logout: () => set({ currentUser: null, isAuthenticated: false }),
+      logout: () => {
+        localStorage.removeItem('cyberops-token')
+        set({ currentUser: null, isAuthenticated: false })
+      },
 
       updateProfile: (data) =>
-        set((state) => ({
-          currentUser: { ...state.currentUser, ...data },
-        })),
+        set((state) => ({ currentUser: { ...state.currentUser, ...data } })),
     }),
-    { name: 'mfe-auth' }
+    { name: 'cyberops-session', partialize: (s) => ({ currentUser: s.currentUser, isAuthenticated: s.isAuthenticated }) }
   )
 )

@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, Users, Shield, AppWindow, LogOut,
-  Inbox, Settings, UserCog, ChevronRight,
+  Inbox, Settings, Tag,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
-import { useRequestStore } from '../store/useRequestStore'
+import { useApi } from '../hooks/useApi'
+import { api } from '../lib/api'
 
 const NAV_USER = [
   { to: '/portal', icon: LayoutGrid, label: 'Portal de Apps', group: null },
@@ -12,6 +13,7 @@ const NAV_USER = [
 
 const NAV_ADMIN = [
   { to: '/admin/apps', icon: AppWindow, label: 'Aplicações' },
+  { to: '/admin/categories', icon: Tag, label: 'Categorias' },
   { to: '/admin/users', icon: Users, label: 'Usuários' },
   { to: '/admin/permissions', icon: Shield, label: 'Permissões' },
   { to: '/admin/requests', icon: Inbox, label: 'Solicitações', badge: true },
@@ -65,7 +67,8 @@ function NavItem({ to, icon: Icon, label, badge, pendingCount }) {
 
 export default function Sidebar() {
   const { currentUser, logout } = useAuthStore()
-  const pendingCount = useRequestStore((s) => s.getPendingCount())
+  const { data: requests } = useApi(() => api.getRequests(), [currentUser?.role])
+  const pendingCount = currentUser?.role === 'admin' ? (requests || []).filter(r => r.status === 'pending').length : 0
   const navigate = useNavigate()
 
   return (

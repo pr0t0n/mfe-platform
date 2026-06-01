@@ -163,6 +163,13 @@ export const useAppStore = create(
           permissions: { ...state.permissions, [appId]: userIds },
         })),
     }),
-    { name: 'mfe-apps' }
+    {
+      name: 'cyberops-apps-v1',
+      version: 1,
+      migrate: (old) => ({
+        apps: old?.apps ?? INITIAL_APPS,
+        permissions: old?.permissions ?? INITIAL_PERMISSIONS,
+      }),
+    }
   )
 )

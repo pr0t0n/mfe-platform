@@ -1,16 +1,41 @@
 services:
-  mfe-platform:
+  api:
     build:
-      context: .
+      context: ./server
       dockerfile: Dockerfile
-    image: mfe-platform:latest
-    container_name: mfe-platform
+    image: cyberops-api:latest
+    container_name: cyberops-api
+    environment:
+      PORT: 3001
+      JWT_SECRET: cyberops-valid-secret-2025
+      DATA_DIR: /data
+    volumes:
+      - cyberops-db:/data
     ports:
-      - "8080:80"
+      - "3001:3001"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3001
+    image: cyberops-frontend:latest
+    container_name: cyberops-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  cyberops-db:
+    name: cyberops-db

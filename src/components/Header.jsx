@@ -1,11 +1,13 @@
 import { Bell, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
-import { useRequestStore } from '../store/useRequestStore'
+import { useApi } from '../hooks/useApi'
+import { api } from '../lib/api'
 import { useNavigate } from 'react-router-dom'
 
 export default function Header({ title, subtitle, eyebrow, actions }) {
   const { currentUser } = useAuthStore()
-  const pendingCount = useRequestStore((s) => s.getPendingCount())
+  const { data: requests } = useApi(() => api.getRequests(), [currentUser?.role])
+  const pendingCount = currentUser?.role === 'admin' ? (requests || []).filter(r => r.status === 'pending').length : 0
   const navigate = useNavigate()
 
   return (
