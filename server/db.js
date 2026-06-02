@@ -175,4 +175,33 @@ function seed () {
 }
 
 seed()
+
+// ── Seeds independentes: sempre populam se a tabela estiver vazia ────────────
+// Não dependem de userCount — executam mesmo quando banco já tem outros dados.
+
+function seedIfEmpty (table, inserts) {
+  const count = db.prepare(`SELECT COUNT(*) as n FROM ${table}`).get().n
+  if (count > 0) return
+  console.log(`[db] Populando ${table}...`)
+  inserts()
+}
+
+seedIfEmpty('categories', () => {
+  const ins = db.prepare('INSERT OR IGNORE INTO categories (name,sort) VALUES (?,?)')
+  ;['Analytics','CRM','ERP','RH','Marketing','Logística','TI','Jurídico','Outros'].forEach((c, i) => ins.run(c, i))
+})
+
+seedIfEmpty('companies', () => {
+  const ins = db.prepare('INSERT OR IGNORE INTO companies (name,sort) VALUES (?,?)')
+  ;['VALID','Cliente A','Cliente B','Parceiro'].forEach((c, i) => ins.run(c, i))
+})
+
+seedIfEmpty('settings', () => {
+  const ins = db.prepare('INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)')
+  ins.run('sso_global_enabled', '1')
+  ins.run('trial_default_days', '30')
+  ins.run('platform_name', 'CyberOps HUB')
+  ins.run('platform_subtitle', 'Plataforma de Cyber Security VALID')
+})
+
 module.exports = db
