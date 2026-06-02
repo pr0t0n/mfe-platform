@@ -1,62 +1,47 @@
 const express = require('express')
-const db = require('../db')
+const { query } = require('../db')
 const requireAuth = require('../middleware/auth')
 const { requireAdmin } = require('../middleware/auth')
 
 const router = express.Router()
 
-// GET /api/company-permissions
-// Retorna { "VALID": ["app-1","app-2"], "Cliente A": [] }
-router.get('/', requireAuth, requireAdmin, (_req, res) => {
-  const companies = db.prepare('SELECT name FROM companies ORDER BY sort, name').all()
-  const rows = db.prepare('SELECT company_name, app_id FROM company_permissions').all()
-
-  const map = {}
-  for (const { name } of companies) map[name] = []
-  for (const { company_name, app_id } of rows) {
-    if (!map[company_name]) map[company_name] = []
-    map[company_name].push(app_id)
-  }
-  res.json(map)
+router.get('/', requireAuth, requireAdmin, async (_req, res) => {
+  try {
+    const { rows: companies } = await query('SELECT name FROM companies ORDER BY sort, name')
+    const { rows } = await query('SELECT company_name, app_id FROM company_permissions')
+    const map = {}
+    for (const { name } of companies) map[name] = []
+    for (const { company_name, app_id } of rows) {
+      if (!map[company_name]) map[company_name] = []
+      map[company_name].push(app_id)
+    }
+    res.json(map)
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/company-permissions/grant
-// { company, appId }
-router.post('/grant', requireAuth, requireAdmin, (req, res) => {
-  const { company, appId } = req.body
-  if (!company || !appId) return res.status(400).json({ error: 'company e appId obrigatórios' })
-  db.prepare('INSERT OR IGNORE INTO company_permissions (company_name, app_id) VALUES (?,?)').run(company, appId)
-
-  // Concede acesso a todos os usuários ativos da empresa que ainda não têm acesso
-  const users = db.prepare("SELECT id FROM users WHERE company=? AND active=1").all(company)
-  const ins = db.prepare('INSERT OR IGNORE INTO permissions (app_id, user_id) VALUES (?,?)')
-  for (const { id } of users) ins.run(appId, id)
-
-  res.json({ ok: true, users_updated: users.length })
+router.post('/grant', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { company, appId } = req.body
+    if (!company || !appId) return res.status(400).json({ error: 'company e appId obrigatórios' })
+    await query('INSERT INTO company_permissions (company_name,app_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [company, appId])
+    const { rows: users } = await query('SELECT id FROM users WHERE company=$1 AND active=true', [company])
+    for (const { id } of users) {
+      await query('INSERT INTO permissions (app_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [appId, id])
+    }
+    res.json({ ok: true, users_updated: users.length })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/company-permissions/revoke
-// { company, appId }
-router.post('/revoke', requireAuth, requireAdmin, (req, res) => {
-  const { company, appId } = req.body
-  db.prepare('DELETE FROM company_permissions WHERE company_name=? AND app_id=?').run(company, appId)
-
-  // Remove acesso de todos os usuários da empresa que receberam via empresa
-  // (não remove quem recebeu permissão individual — verificação simplificada: remove todos)
-  const users = db.prepare("SELECT id FROM users WHERE company=?").all(company)
-  const del = db.prepare('DELETE FROM permissions WHERE app_id=? AND user_id=?')
-  for (const { id } of users) del.run(appId, id)
-
-  res.json({ ok: true })
+router.post('/revoke', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { company, appId } = req.body
+    await query('DELETE FROM company_permissions WHERE company_name=$1 AND app_id=$2', [company, appId])
+    const { rows: users } = await query('SELECT id FROM users WHERE company=$1', [company])
+    for (const { id } of users) {
+      await query('DELETE FROM permissions WHERE app_id=$1 AND user_id=$2', [appId, id])
+    }
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
-
-// Quando um novo usuário é criado na empresa, herda as permissões da empresa
-function applyCompanyPermissions (userId, company) {
-  if (!company) return
-  const appIds = db.prepare('SELECT app_id FROM company_permissions WHERE company_name=?').all(company)
-  const ins = db.prepare('INSERT OR IGNORE INTO permissions (app_id, user_id) VALUES (?,?)')
-  for (const { app_id } of appIds) ins.run(app_id, userId)
-}
 
 module.exports = router
-module.exports.applyCompanyPermissions = applyCompanyPermissions

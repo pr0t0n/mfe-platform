@@ -1,45 +1,38 @@
 const express = require('express')
-const db = require('../db')
+const { query } = require('../db')
 const requireAuth = require('../middleware/auth')
 const { requireAdmin } = require('../middleware/auth')
 
 const router = express.Router()
 
-// Garante seed de settings se tabela vazia
-function ensureDefaults () {
-  const ins = db.prepare('INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)')
-  ins.run('sso_global_enabled', '1')
-  ins.run('trial_default_days', '30')
-  ins.run('platform_name', 'CyberOps HUB')
-  ins.run('platform_subtitle', 'Plataforma de Cyber Security VALID')
-}
+const DEFAULTS = [['sso_global_enabled','1'],['trial_default_days','30'],['platform_name','CyberOps HUB'],['platform_subtitle','Plataforma de Cyber Security VALID']]
 
-// GET /api/settings  — retorna { key: value, ... }
-router.get('/', requireAuth, (req, res) => {
-  ensureDefaults()
-  const rows = db.prepare('SELECT key, value FROM settings').all()
-  const map = {}
-  for (const { key, value } of rows) map[key] = value
-  res.json(map)
+router.get('/', requireAuth, async (_req, res) => {
+  try {
+    for (const [k,v] of DEFAULTS) await query('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT DO NOTHING',[k,v])
+    const { rows } = await query('SELECT key, value FROM settings')
+    const map = {}
+    for (const { key, value } of rows) map[key] = value
+    res.json(map)
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// PUT /api/settings  — salva { key: value, ... }
-router.put('/', requireAuth, requireAdmin, (req, res) => {
-  const upsert = db.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
-  const updateAll = db.transaction((entries) => {
-    for (const [key, value] of entries) upsert.run(key, String(value))
-  })
-  updateAll(Object.entries(req.body || {}))
-  res.json({ ok: true })
+router.put('/', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    for (const [key, value] of Object.entries(req.body || {})) {
+      await query('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2',[key, String(value)])
+    }
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// PATCH /api/settings/:key/toggle  — inverte boolean (0↔1)
-router.patch('/:key/toggle', requireAuth, requireAdmin, (req, res) => {
-  const current = db.prepare('SELECT value FROM settings WHERE key=?').get(req.params.key)
-  const next = current?.value === '1' ? '0' : '1'
-  db.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
-    .run(req.params.key, next)
-  res.json({ ok: true, value: next })
+router.patch('/:key/toggle', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await query('SELECT value FROM settings WHERE key=$1', [req.params.key])
+    const next = rows[0]?.value === '1' ? '0' : '1'
+    await query('INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2',[req.params.key, next])
+    res.json({ ok: true, value: next })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 module.exports = router

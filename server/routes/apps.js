@@ -1,73 +1,70 @@
 const express = require('express')
-const db = require('../db')
+const { query } = require('../db')
 const requireAuth = require('../middleware/auth')
 const { requireAdmin } = require('../middleware/auth')
 
 const router = express.Router()
 
-// GET /api/apps  — lista todos os apps com flag hasAccess para o usuário logado
-router.get('/', requireAuth, (req, res) => {
-  const apps = db.prepare('SELECT * FROM apps ORDER BY name').all()
-  const perms = db.prepare('SELECT app_id FROM permissions WHERE user_id = ?').all(req.user.id)
-  const myAppIds = new Set(perms.map(p => p.app_id))
-
-  // Para cada app com acesso, busca info de trial se houver
-  const trialMap = {}
-  if (myAppIds.size > 0) {
-    const trials = db.prepare(
-      `SELECT app_id, granted_at, expires_at, is_trial FROM trial_access WHERE user_id = ?`
-    ).all(req.user.id)
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const { rows: apps } = await query('SELECT * FROM apps ORDER BY name')
+    const { rows: perms } = await query('SELECT app_id FROM permissions WHERE user_id=$1', [req.user.id])
+    const { rows: trials } = await query('SELECT app_id, granted_at, expires_at, is_trial FROM trial_access WHERE user_id=$1', [req.user.id])
+    const myIds = new Set(perms.map(p => p.app_id))
+    const trialMap = {}
     for (const t of trials) trialMap[t.app_id] = t
-  }
-
-  res.json(apps.map(a => ({
-    ...a,
-    active: !!a.active,
-    sso_enabled: !!a.sso_enabled,
-    hasAccess: myAppIds.has(a.id),
-    trial: trialMap[a.id] || null,
-  })))
+    res.json(apps.map(a => ({ ...a, hasAccess: myIds.has(a.id), trial: trialMap[a.id] || null })))
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// POST /api/apps
-router.post('/', requireAuth, requireAdmin, (req, res) => {
-  const { name, description, url, icon, color, category, active } = req.body
-  if (!name || !url) return res.status(400).json({ error: 'nome e url são obrigatórios' })
-  const id = `app-${Date.now()}`
-  const created_at = new Date().toISOString().split('T')[0]
-  db.prepare(`INSERT INTO apps (id,name,description,url,icon,color,category,active,created_at)
-              VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(id, name, description || '', url, icon || 'Globe', color || 'from-blue-500 to-cyan-500', category || 'Outros', active !== false ? 1 : 0, created_at)
-  db.prepare('INSERT OR IGNORE INTO permissions (app_id, user_id) VALUES (?,?)').run(id, '1')
-  res.status(201).json({ id })
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name, description, url, icon, color, category, active, trial_days } = req.body
+    if (!name || !url) return res.status(400).json({ error: 'nome e url são obrigatórios' })
+    const id = `app-${Date.now()}`
+    const now = new Date().toISOString().split('T')[0]
+    await query(
+      `INSERT INTO apps (id,name,description,url,icon,color,category,active,sso_enabled,trial_days,created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,false,$9,$10)`,
+      [id, name, description||'', url, icon||'Globe', color||'from-blue-500 to-cyan-500', category||'Outros', active!==false, trial_days||30, now]
+    )
+    await query('INSERT INTO permissions (app_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [id, '1'])
+    res.status(201).json({ id })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// PUT /api/apps/:id
-router.put('/:id', requireAuth, requireAdmin, (req, res) => {
-  const { name, description, url, icon, color, category, active, trial_days } = req.body
-  db.prepare(`UPDATE apps SET name=?,description=?,url=?,icon=?,color=?,category=?,active=?,trial_days=? WHERE id=?`)
-    .run(name, description, url, icon, color, category, active ? 1 : 0, trial_days ?? 30, req.params.id)
-  res.json({ ok: true })
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { name, description, url, icon, color, category, active, trial_days } = req.body
+    await query(
+      'UPDATE apps SET name=$1,description=$2,url=$3,icon=$4,color=$5,category=$6,active=$7,trial_days=$8 WHERE id=$9',
+      [name, description, url, icon, color, category, !!active, trial_days||30, req.params.id]
+    )
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// DELETE /api/apps/:id
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
-  db.prepare('DELETE FROM permissions WHERE app_id = ?').run(req.params.id)
-  db.prepare('DELETE FROM apps WHERE id = ?').run(req.params.id)
-  res.json({ ok: true })
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await query('DELETE FROM permissions WHERE app_id=$1', [req.params.id])
+    await query('DELETE FROM apps WHERE id=$1', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// PATCH /api/apps/:id/toggle
-router.patch('/:id/toggle', requireAuth, requireAdmin, (req, res) => {
-  db.prepare('UPDATE apps SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id)
-  res.json({ ok: true })
+router.patch('/:id/toggle', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await query('UPDATE apps SET active = NOT active WHERE id=$1', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-// PATCH /api/apps/:id/toggle-sso
-router.patch('/:id/toggle-sso', requireAuth, requireAdmin, (req, res) => {
-  db.prepare('UPDATE apps SET sso_enabled = CASE WHEN sso_enabled=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id)
-  const app = db.prepare('SELECT sso_enabled FROM apps WHERE id=?').get(req.params.id)
-  res.json({ ok: true, sso_enabled: !!app.sso_enabled })
+router.patch('/:id/toggle-sso', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await query('UPDATE apps SET sso_enabled = NOT sso_enabled WHERE id=$1', [req.params.id])
+    const { rows } = await query('SELECT sso_enabled FROM apps WHERE id=$1', [req.params.id])
+    res.json({ ok: true, sso_enabled: rows[0]?.sso_enabled })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 module.exports = router

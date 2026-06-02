@@ -1,6 +1,26 @@
 services:
 
-  # ── API (Node.js + SQLite) ───────────────────────────────────────────────
+  # ── Banco de Dados (PostgreSQL) ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: cyberops-db
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-cyberops}
+      POSTGRES_USER:     ${POSTGRES_USER:-cyberops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyberops2025}
+    volumes:
+      - cyberops-pgdata:/var/lib/postgresql/data
+    networks:
+      - cyberops
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cyberops} -d ${POSTGRES_DB:-cyberops}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── API (Node.js + Express) ────────────────────────────────────────────────
   api:
     build:
       context: ./server
@@ -8,13 +28,14 @@ services:
     image: cyberops-api:latest
     container_name: cyberops-api
     environment:
-      PORT: 3001
-      JWT_SECRET: ${JWT_SECRET:-cyberops-valid-secret-2025}
-      SSO_SECRET: ${SSO_SECRET:-cyberops-sso-secret-2025}
-      DATA_DIR: /data
-      NODE_ENV: production
-    volumes:
-      - cyberops-db:/data
+      PORT:        3001
+      NODE_ENV:    production
+      DATABASE_URL: postgres://${POSTGRES_USER:-cyberops}:${POSTGRES_PASSWORD:-cyberops2025}@db:5432/${POSTGRES_DB:-cyberops}
+      JWT_SECRET:  ${JWT_SECRET:-cyberops-valid-secret-2025}
+      SSO_SECRET:  ${SSO_SECRET:-cyberops-sso-secret-2025}
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - cyberops
     restart: unless-stopped
@@ -23,15 +44,14 @@ services:
       interval: 20s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
-  # ── Frontend (nginx + proxy reverso para API) ─────────────────────────────
+  # ── Frontend (nginx + proxy reverso) ─────────────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Em produção, aponta para /api (proxy reverso pelo nginx)
         VITE_API_URL: ""
     image: cyberops-frontend:latest
     container_name: cyberops-frontend
@@ -43,17 +63,11 @@ services:
     networks:
       - cyberops
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
 
 networks:
   cyberops:
     name: cyberops-network
 
 volumes:
-  cyberops-db:
-    name: cyberops-db
+  cyberops-pgdata:
+    name: cyberops-pgdata
