@@ -79,6 +79,19 @@ db.exec(`
     is_trial    INTEGER NOT NULL DEFAULT 1,
     UNIQUE(app_id, user_id)
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
+  -- Permissões de acesso no nível de empresa
+  -- Todos os usuários da empresa herdam esses acessos automaticamente
+  CREATE TABLE IF NOT EXISTS company_permissions (
+    company_name  TEXT NOT NULL,
+    app_id        TEXT NOT NULL,
+    PRIMARY KEY (company_name, app_id)
+  );
 `)
 
 // Migrations para colunas adicionadas após criação inicial (idempotentes)
@@ -91,7 +104,12 @@ migrate("ALTER TABLE apps ADD COLUMN trial_days INTEGER DEFAULT 30")
 
 function seed () {
   const userCount = db.prepare('SELECT COUNT(*) as n FROM users').get().n
-  if (userCount > 0) return
+  if (userCount > 0) {
+    // Banco já tem dados — NUNCA sobrescreve registros existentes
+    console.log(`[db] Banco existente: ${userCount} usuário(s). Seed ignorado.`)
+    return
+  }
+  console.log('[db] Banco vazio — executando seed inicial...')
 
   const now = new Date().toISOString()
   const hash = (p) => bcrypt.hashSync(p, 10)
@@ -135,6 +153,13 @@ function seed () {
     insertApp.run({ ...app, created_at: now.split('T')[0] })
     for (const uid of (DEFAULT_PERMS[app.id] || ['1'])) insertPerm.run(app.id, uid)
   }
+
+  // Seed settings defaults
+  const insSetting = db.prepare('INSERT OR IGNORE INTO settings (key,value) VALUES (?,?)')
+  insSetting.run('sso_global_enabled', '1')       // SSO JWT global: ativo por padrão
+  insSetting.run('trial_default_days', '30')       // Degustação padrão em dias
+  insSetting.run('platform_name', 'CyberOps HUB') // Nome da plataforma
+  insSetting.run('platform_subtitle', 'Plataforma de Cyber Security VALID')
 
   // Seed categorias
   const cats = ['Analytics','CRM','ERP','RH','Marketing','Logística','TI','Jurídico','Outros']

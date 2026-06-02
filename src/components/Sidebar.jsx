@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutGrid, Users, Shield, AppWindow, LogOut,
-  Inbox, Settings, Tag,
+  Inbox, Settings, Tag, SlidersHorizontal, Building2,
 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { useApi } from '../hooks/useApi'
@@ -16,7 +16,9 @@ const NAV_ADMIN = [
   { to: '/admin/categories', icon: Tag, label: 'Categorias' },
   { to: '/admin/users', icon: Users, label: 'Usuários' },
   { to: '/admin/permissions', icon: Shield, label: 'Permissões' },
+  { to: '/admin/company-permissions', icon: Building2, label: 'Acesso Empresa' },
   { to: '/admin/requests', icon: Inbox, label: 'Solicitações', badge: true },
+  { to: '/admin/settings', icon: SlidersHorizontal, label: 'Configurações' },
 ]
 
 const SB = {

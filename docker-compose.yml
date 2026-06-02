@@ -1,4 +1,6 @@
 services:
+
+  # ── API (Node.js + SQLite) ───────────────────────────────────────────────
   api:
     build:
       context: ./server
@@ -7,34 +9,50 @@ services:
     container_name: cyberops-api
     environment:
       PORT: 3001
-      JWT_SECRET: cyberops-valid-secret-2025
+      JWT_SECRET: ${JWT_SECRET:-cyberops-valid-secret-2025}
+      SSO_SECRET: ${SSO_SECRET:-cyberops-sso-secret-2025}
       DATA_DIR: /data
+      NODE_ENV: production
     volumes:
       - cyberops-db:/data
-    ports:
-      - "3001:3001"
+    networks:
+      - cyberops
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
-      interval: 30s
+      interval: 20s
       timeout: 5s
-      retries: 3
-      start_period: 15s
+      retries: 5
+      start_period: 10s
 
+  # ── Frontend (nginx + proxy reverso para API) ─────────────────────────────
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3001
+        # Em produção, aponta para /api (proxy reverso pelo nginx)
+        VITE_API_URL: ""
     image: cyberops-frontend:latest
     container_name: cyberops-frontend
     ports:
-      - "8080:80"
+      - "${PORT:-8080}:80"
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - cyberops
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+networks:
+  cyberops:
+    name: cyberops-network
 
 volumes:
   cyberops-db:

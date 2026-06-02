@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs')
 const db = require('../db')
 const requireAuth = require('../middleware/auth')
 const { requireAdmin } = require('../middleware/auth')
+const { applyCompanyPermissions } = require('./company-permissions')
 
 const router = express.Router()
 
@@ -21,6 +22,10 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
     db.prepare(`INSERT INTO users (id,name,email,password,role,department,company,avatar,active,created_at)
                 VALUES (?,?,?,?,?,?,?,?,1,?)`
     ).run(id, name, email.toLowerCase().trim(), bcrypt.hashSync(password, 10), role || 'user', department || '', company || '', avatar, new Date().toISOString().split('T')[0])
+
+    // Herda permissões da empresa automaticamente
+    if (company) applyCompanyPermissions(id, company)
+
     res.status(201).json({ id })
   } catch (e) {
     if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'E-mail já cadastrado.' })

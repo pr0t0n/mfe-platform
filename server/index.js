@@ -15,8 +15,10 @@ app.use('/api/users',       require('./routes/users'))
 app.use('/api/permissions', require('./routes/permissions'))
 app.use('/api/requests',    require('./routes/requests'))
 app.use('/api/categories',  require('./routes/categories'))
-app.use('/api/companies',   require('./routes/companies'))
+app.use('/api/companies',           require('./routes/companies'))
+app.use('/api/company-permissions', require('./routes/company-permissions'))
 app.use('/api/sso',         require('./routes/sso'))
+app.use('/api/settings',    require('./routes/settings'))
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }))
 

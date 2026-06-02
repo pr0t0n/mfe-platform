@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+// Em Docker: VITE_API_URL vazio → usa proxy nginx (/api/...)
+// Em dev local: VITE_API_URL=http://localhost:3001
+const BASE = import.meta.env.VITE_API_URL || ''
 
 function getToken () {
   return localStorage.getItem('cyberops-token')
@@ -65,6 +67,11 @@ export const api = {
   grantAccess:    (appId, userId) => request('/api/permissions/grant',  { method: 'POST', body: JSON.stringify({ appId, userId }) }),
   revokeAccess:   (appId, userId) => request('/api/permissions/revoke', { method: 'POST', body: JSON.stringify({ appId, userId }) }),
 
+  // Settings
+  getSettings: () => request('/api/settings'),
+  saveSettings: (data) => request('/api/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  toggleSetting: (key) => request(`/api/settings/${key}/toggle`, { method: 'PATCH' }),
+
   // SSO
   getSsoToken: (appId) => request('/api/sso/token', { method: 'POST', body: JSON.stringify({ appId }) }),
 
@@ -73,6 +80,11 @@ export const api = {
   createCompany:  (name)       => request('/api/companies',       { method: 'POST',   body: JSON.stringify({ name }) }),
   updateCompany:  (id, name)   => request(`/api/companies/${id}`, { method: 'PUT',    body: JSON.stringify({ name }) }),
   deleteCompany:  (id)         => request(`/api/companies/${id}`, { method: 'DELETE' }),
+
+  // Company permissions
+  getCompanyPermissions: () => request('/api/company-permissions'),
+  grantCompanyAccess:    (company, appId) => request('/api/company-permissions/grant',  { method: 'POST', body: JSON.stringify({ company, appId }) }),
+  revokeCompanyAccess:   (company, appId) => request('/api/company-permissions/revoke', { method: 'POST', body: JSON.stringify({ company, appId }) }),
 
   // Categories
   getCategories:  ()         => request('/api/categories'),

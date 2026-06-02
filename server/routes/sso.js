@@ -11,6 +11,12 @@ router.post('/token', requireAuth, (req, res) => {
   const { appId } = req.body
   if (!appId) return res.status(400).json({ error: 'appId obrigatório' })
 
+  // Verifica toggle global de SSO
+  const globalSetting = db.prepare("SELECT value FROM settings WHERE key='sso_global_enabled'").get()
+  if (globalSetting?.value === '0') {
+    return res.status(403).json({ error: 'SSO desativado globalmente pelo administrador.' })
+  }
+
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id)
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado' })
 
