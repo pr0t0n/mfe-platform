@@ -1,7 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ExternalLink, RefreshCw, AlertTriangle, LayoutGrid, ShieldX, Copy, Check } from 'lucide-react'
+import { ArrowLeft, ExternalLink, RefreshCw, AlertTriangle, LayoutGrid, ShieldX, Copy, Check, KeyRound } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import { useAppStore } from '../store/useAppStore'
 import { useAuthStore } from '../store/useAuthStore'
 import { useApi } from '../hooks/useApi'
 import { api } from '../lib/api'
@@ -93,15 +92,28 @@ export default function AppViewer() {
   const { data: apps } = useApi(() => api.getApps())
   const [frameState, setFrameState] = useState('loading') // loading | ok | blocked
   const [reloadKey, setReloadKey] = useState(0)
+  const [ssoUrl, setSsoUrl] = useState(null)
   const timeoutRef = useRef(null)
   const iframeRef = useRef(null)
 
   const app = (apps || []).find(a => a.id === appId)
 
+  // Quando o app tem SSO ativo, busca o token e constrói a URL com ele
   useEffect(() => {
+    if (!app) return
+    if (app.sso_enabled) {
+      api.getSsoToken(app.id).then(({ sso_token }) => {
+        const separator = app.url.includes('?') ? '&' : '?'
+        setSsoUrl(`${app.url}${separator}sso_token=${sso_token}`)
+      }).catch(() => setSsoUrl(app.url))
+    } else {
+      setSsoUrl(app.url)
+    }
+  }, [app?.id, app?.sso_enabled, reloadKey])
+
+  useEffect(() => {
+    if (!ssoUrl) return
     setFrameState('loading')
-    // Se após LOAD_TIMEOUT_MS o onLoad não disparou OU o iframe está vazio,
-    // assume X-Frame-Options bloqueou
     timeoutRef.current = setTimeout(() => {
       try {
         // Tenta acessar contentDocument — lança exceção se cross-origin bloqueado
@@ -115,7 +127,7 @@ export default function AppViewer() {
     }, LOAD_TIMEOUT_MS)
 
     return () => clearTimeout(timeoutRef.current)
-  }, [reloadKey, appId])
+  }, [ssoUrl])
 
   const handleLoad = () => {
     clearTimeout(timeoutRef.current)
@@ -206,6 +218,11 @@ export default function AppViewer() {
             <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Online
           </span>
         )}
+        {app.sso_enabled && (
+          <span className="flex items-center gap-1 font-mono text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(233,99,99,0.10)', color: '#a83232', border: '1px solid rgba(233,99,99,0.20)' }}>
+            <KeyRound size={10} /> SSO ativo
+          </span>
+        )}
 
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
@@ -249,9 +266,9 @@ export default function AppViewer() {
               </div>
             )}
             <iframe
-              key={reloadKey}
+              key={`${reloadKey}-${ssoUrl}`}
               ref={iframeRef}
-              src={app.url}
+              src={ssoUrl || app.url}
               title={app.name}
               className="w-full h-full border-0"
               onLoad={handleLoad}

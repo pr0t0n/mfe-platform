@@ -1,0 +1,17 @@
+import { chromium } from 'playwright'
+const browser = await chromium.launch()
+const page = await browser.newPage()
+await page.setViewportSize({ width: 1440, height: 900 })
+await page.goto('http://localhost:5173/login')
+await page.fill('input[type="email"]', 'admin@empresa.com')
+await page.fill('input[type="password"]', 'admin123')
+await page.click('button[type="submit"]')
+await page.waitForURL('**/portal')
+await page.waitForLoadState('networkidle')
+await page.screenshot({ path: '/tmp/sidebar-full.png', fullPage: false })
+// List all sidebar nav items
+const items = await page.locator('aside a, aside button').allTextContents()
+console.log('Sidebar items:', items.filter(t => t.trim()).join(' | '))
+const hasCat = await page.locator('text=Categorias').isVisible()
+console.log('Categorias visível:', hasCat)
+await browser.close()

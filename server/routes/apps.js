@@ -14,6 +14,7 @@ router.get('/', requireAuth, (req, res) => {
   res.json(apps.map(a => ({
     ...a,
     active: !!a.active,
+    sso_enabled: !!a.sso_enabled,
     hasAccess: myAppIds.has(a.id),
   })))
 })
@@ -50,6 +51,13 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 router.patch('/:id/toggle', requireAuth, requireAdmin, (req, res) => {
   db.prepare('UPDATE apps SET active = CASE WHEN active=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id)
   res.json({ ok: true })
+})
+
+// PATCH /api/apps/:id/toggle-sso
+router.patch('/:id/toggle-sso', requireAuth, requireAdmin, (req, res) => {
+  db.prepare('UPDATE apps SET sso_enabled = CASE WHEN sso_enabled=1 THEN 0 ELSE 1 END WHERE id=?').run(req.params.id)
+  const app = db.prepare('SELECT sso_enabled FROM apps WHERE id=?').get(req.params.id)
+  res.json({ ok: true, sso_enabled: !!app.sso_enabled })
 })
 
 module.exports = router

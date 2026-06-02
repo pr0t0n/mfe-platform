@@ -31,6 +31,7 @@ export const api = {
   updateApp: (id, data) => request(`/api/apps/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteApp: (id) => request(`/api/apps/${id}`, { method: 'DELETE' }),
   toggleApp: (id) => request(`/api/apps/${id}/toggle`, { method: 'PATCH' }),
+  toggleAppSso: (id) => request(`/api/apps/${id}/toggle-sso`, { method: 'PATCH' }),
 
   // Users
   getUsers: () => request('/api/users'),
@@ -43,6 +44,15 @@ export const api = {
   getPermissions: () => request('/api/permissions'),
   grantAccess: (appId, userId) => request('/api/permissions/grant', { method: 'POST', body: JSON.stringify({ appId, userId }) }),
   revokeAccess: (appId, userId) => request('/api/permissions/revoke', { method: 'POST', body: JSON.stringify({ appId, userId }) }),
+
+  // SSO
+  getSsoToken: (appId) => request('/api/sso/token', { method: 'POST', body: JSON.stringify({ appId }) }),
+
+  // Companies
+  getCompanies: () => request('/api/companies'),
+  createCompany: (name) => request('/api/companies', { method: 'POST', body: JSON.stringify({ name }) }),
+  updateCompany: (id, name) => request(`/api/companies/${id}`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  deleteCompany: (id) => request(`/api/companies/${id}`, { method: 'DELETE' }),
 
   // Categories
   getCategories: () => request('/api/categories'),

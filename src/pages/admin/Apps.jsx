@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ExternalLink, Search, Loader } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ExternalLink, Search, Loader, KeyRound } from 'lucide-react'
 import Header from '../../components/Header'
 import Modal from '../../components/Modal'
 import AppIcon from '../../components/AppIcon'
@@ -73,7 +73,7 @@ export default function AdminApps() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid #e5dcd5', background: '#faf8f4' }}>
-                {['Aplicação','URL','Categoria','Status','Ações'].map(h => (
+                {['Aplicação','URL','Categoria','Status','SSO','Ações'].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: '#6b6b6b' }}>{h}</th>
                 ))}
               </tr>
@@ -102,6 +102,21 @@ export default function AdminApps() {
                     <button onClick={() => handleToggle(app.id)} className="inline-flex items-center gap-1 text-[11.5px] font-medium px-2 py-1 rounded-full transition-colors" style={{ color: app.active ? '#1f8a59' : '#6b6b6b', background: app.active ? 'rgba(34,145,96,0.10)' : '#f0ebe7' }}>
                       {app.active ? <ToggleRight size={13}/> : <ToggleLeft size={13}/>}
                       {app.active ? 'Ativo' : 'Inativo'}
+                    </button>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <button
+                      onClick={() => api.toggleAppSso(app.id).then(reload)}
+                      title={app.sso_enabled ? 'SSO ativo — clique para desativar' : 'SSO inativo — clique para ativar'}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors font-mono"
+                      style={{
+                        color: app.sso_enabled ? '#a83232' : '#6b6b6b',
+                        background: app.sso_enabled ? 'rgba(233,99,99,0.10)' : '#f0ebe7',
+                        border: `1px solid ${app.sso_enabled ? 'rgba(233,99,99,0.30)' : '#e5dcd5'}`,
+                      }}
+                    >
+                      <KeyRound size={11} />
+                      {app.sso_enabled ? 'Ativo' : 'Off'}
                     </button>
                   </td>
                   <td className="px-5 py-3">

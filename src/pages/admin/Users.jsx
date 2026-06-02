@@ -7,7 +7,7 @@ import { api } from '../../lib/api'
 import { useAuthStore } from '../../store/useAuthStore'
 
 const DEPARTMENTS = ['TI','Comercial','Financeiro','RH','Marketing','Jurídico','Operações','Diretoria']
-const EMPTY = { name:'', email:'', role:'user', department:'TI', password:'' }
+const EMPTY = { name:'', email:'', role:'user', department:'TI', company:'', password:'' }
 
 function Avatar({ name }) {
   const initials = name?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()||'??'
@@ -18,6 +18,7 @@ function Avatar({ name }) {
 
 export default function AdminUsers() {
   const { data: users, loading, reload } = useApi(() => api.getUsers())
+  const { data: companies } = useApi(() => api.getCompanies())
   const { currentUser } = useAuthStore()
   const [search, setSearch] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -34,7 +35,7 @@ export default function AdminUsers() {
   )
 
   const openCreate = () => { setEditUser(null); setForm(EMPTY); setError(''); setModalOpen(true) }
-  const openEdit = u => { setEditUser(u); setForm({name:u.name,email:u.email,role:u.role,department:u.department||'TI',password:''}); setError(''); setModalOpen(true) }
+  const openEdit = u => { setEditUser(u); setForm({name:u.name,email:u.email,role:u.role,department:u.department||'TI',company:u.company||'',password:''}); setError(''); setModalOpen(true) }
 
   const handleSave = async (e) => {
     e.preventDefault(); setSaving(true); setError('')
@@ -74,7 +75,7 @@ export default function AdminUsers() {
           {loading ? <div className="flex justify-center py-12"><Loader size={20} className="animate-spin" style={{color:'#e96363'}}/></div> : (
           <table className="w-full text-sm">
             <thead><tr style={{borderBottom:'1px solid #e5dcd5',background:'#faf8f4'}}>
-              {['Usuário','Departamento','Perfil','Status','Ações'].map(h=>(
+              {['Usuário','Empresa','Departamento','Perfil','Status','Ações'].map(h=>(
                 <th key={h} className="text-left px-5 py-3 text-[10.5px] font-semibold uppercase tracking-[0.14em]" style={{color:'#6b6b6b'}}>{h}</th>
               ))}
             </tr></thead>
@@ -93,6 +94,7 @@ export default function AdminUsers() {
                       </div>
                     </div>
                   </td>
+                  <td className="px-5 py-3 text-[12.5px]" style={{color:'#6b6b6b'}}>{user.company||'—'}</td>
                   <td className="px-5 py-3 text-[12.5px]" style={{color:'#6b6b6b'}}>{user.department||'—'}</td>
                   <td className="px-5 py-3">
                     {user.role==='admin' ? <span className="flex items-center gap-1 text-[12px] font-medium" style={{color:'#7c3aed'}}><ShieldCheck size={13}/> Admin</span> : <span className="flex items-center gap-1 text-[12px] font-medium" style={{color:'#6b6b6b'}}><User size={13}/> Usuário</span>}
@@ -121,6 +123,13 @@ export default function AdminUsers() {
         <form onSubmit={handleSave} className="space-y-4">
           <div><label className="label">Nome completo</label><input className="input" placeholder="João Silva" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></div>
           <div><label className="label">E-mail</label><input className="input" type="email" placeholder="joao@empresa.com" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></div>
+          <div>
+            <label className="label">Empresa</label>
+            <select className="input" value={form.company} onChange={e=>setForm({...form,company:e.target.value})}>
+              <option value="">— Selecionar empresa —</option>
+              {(companies||[]).map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label">Departamento</label><select className="input" value={form.department} onChange={e=>setForm({...form,department:e.target.value})}>{DEPARTMENTS.map(d=><option key={d}>{d}</option>)}</select></div>
             <div><label className="label">Perfil</label><select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="user">Usuário</option><option value="admin">Administrador</option></select></div>
