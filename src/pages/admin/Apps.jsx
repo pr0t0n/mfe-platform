@@ -20,7 +20,7 @@ const COLORS = [
 ]
 const ICONS = ['BarChart3','Users','DollarSign','UserCheck','Megaphone','Package','Terminal','Scale','Globe','Database','Cloud','Zap','Mail','FileText','ShieldCheck','Layers']
 // Categories loaded from API (see form below)
-const EMPTY = { name:'', description:'', url:'', icon:'Globe', color:'from-blue-500 to-cyan-500', category:'Outros', active:true }
+const EMPTY = { name:'', description:'', url:'', icon:'Globe', color:'from-blue-500 to-cyan-500', category:'Outros', active:true, trial_days:30 }
 
 export default function AdminApps() {
   const { data: apps, loading, reload } = useApi(() => api.getApps())
@@ -39,7 +39,7 @@ export default function AdminApps() {
   )
 
   const openCreate = () => { setEditApp(null); setForm(EMPTY); setError(''); setModalOpen(true) }
-  const openEdit = (app) => { setEditApp(app); setForm({ name:app.name, description:app.description||'', url:app.url, icon:app.icon, color:app.color, category:app.category, active:!!app.active }); setError(''); setModalOpen(true) }
+  const openEdit = (app) => { setEditApp(app); setForm({ name:app.name, description:app.description||'', url:app.url, icon:app.icon, color:app.color, category:app.category, active:!!app.active, trial_days:app.trial_days??30 }); setError(''); setModalOpen(true) }
 
   const handleSave = async (e) => {
     e.preventDefault(); setSaving(true); setError('')

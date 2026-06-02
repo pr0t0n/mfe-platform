@@ -20,6 +20,27 @@ app.use('/api/sso',         require('./routes/sso'))
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }))
 
+// ── Job: revoga acessos de degustação expirados ──────────────────────────────
+function revokeExpiredTrials () {
+  const db = require('./db')
+  const now = new Date().toISOString()
+  const expired = db.prepare(
+    "SELECT app_id, user_id FROM trial_access WHERE is_trial=1 AND expires_at <= ?"
+  ).all(now)
+  if (expired.length > 0) {
+    const revoke = db.prepare('DELETE FROM permissions WHERE app_id=? AND user_id=?')
+    const markRevoked = db.prepare("DELETE FROM trial_access WHERE app_id=? AND user_id=?")
+    for (const { app_id, user_id } of expired) {
+      revoke.run(app_id, user_id)
+      markRevoked.run(app_id, user_id)
+    }
+    console.log(`[trial] ${expired.length} acesso(s) expirado(s) revogados`)
+  }
+}
+
+revokeExpiredTrials()
+setInterval(revokeExpiredTrials, 3600 * 1000) // a cada 1h
+
 app.use((err, _req, res, _next) => {
   console.error(err)
   res.status(500).json({ error: 'Erro interno do servidor.' })

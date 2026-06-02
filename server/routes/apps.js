@@ -11,11 +11,21 @@ router.get('/', requireAuth, (req, res) => {
   const perms = db.prepare('SELECT app_id FROM permissions WHERE user_id = ?').all(req.user.id)
   const myAppIds = new Set(perms.map(p => p.app_id))
 
+  // Para cada app com acesso, busca info de trial se houver
+  const trialMap = {}
+  if (myAppIds.size > 0) {
+    const trials = db.prepare(
+      `SELECT app_id, granted_at, expires_at, is_trial FROM trial_access WHERE user_id = ?`
+    ).all(req.user.id)
+    for (const t of trials) trialMap[t.app_id] = t
+  }
+
   res.json(apps.map(a => ({
     ...a,
     active: !!a.active,
     sso_enabled: !!a.sso_enabled,
     hasAccess: myAppIds.has(a.id),
+    trial: trialMap[a.id] || null,
   })))
 })
 
@@ -34,9 +44,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 
 // PUT /api/apps/:id
 router.put('/:id', requireAuth, requireAdmin, (req, res) => {
-  const { name, description, url, icon, color, category, active } = req.body
-  db.prepare(`UPDATE apps SET name=?,description=?,url=?,icon=?,color=?,category=?,active=? WHERE id=?`)
-    .run(name, description, url, icon, color, category, active ? 1 : 0, req.params.id)
+  const { name, description, url, icon, color, category, active, trial_days } = req.body
+  db.prepare(`UPDATE apps SET name=?,description=?,url=?,icon=?,color=?,category=?,active=?,trial_days=? WHERE id=?`)
+    .run(name, description, url, icon, color, category, active ? 1 : 0, trial_days ?? 30, req.params.id)
   res.json({ ok: true })
 })
 

@@ -3,8 +3,15 @@ import { useAuthStore } from '../store/useAuthStore'
 import Sidebar from '../components/Sidebar'
 
 export default function DashboardLayout() {
-  const { isAuthenticated } = useAuthStore()
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  const { isAuthenticated, logout } = useAuthStore()
+
+  // Garante que o JWT token existe — se não, força novo login
+  const hasToken = !!localStorage.getItem('cyberops-token')
+
+  if (!isAuthenticated || !hasToken) {
+    logout()
+    return <Navigate to="/login" replace />
+  }
 
   return (
     <div className="flex min-h-screen" style={{ background: '#fcfbf8' }}>
